@@ -23,6 +23,7 @@ from qt_ui.sensors.as5311_absolute_node import AS5311AbsoluteSensorNode
 from qt_ui.sensors.as5311_highpass_node import AS5311HighPassNode
 from qt_ui.sensors.as5311_edging_node import AS5311EdgingNode
 from qt_ui.sensors.as5311_velocity_node import AS5311VelocitySensorNode
+from qt_ui.sensors.as5311_heartbeat_node import AS5311HeartbeatNode
 from qt_ui.sensors.imu_hip_thrust_node import IMUHipThrustNode
 from qt_ui.sensors.imu_velocity_node import IMUVelocityNode
 from qt_ui.sensors.pressure_absolute_node import PressureAbsoluteSensorNode
@@ -84,6 +85,7 @@ class SensorsWidget(QWidget, Ui_SensorsWidget):
                 AS5311AbsoluteSensorNode(),
                 AS5311HighPassNode(),
                 AS5311VelocitySensorNode(),
+                AS5311HeartbeatNode(),
                 # AS5311EdgingNode(),
             ],
             CategoryPressure(): [
