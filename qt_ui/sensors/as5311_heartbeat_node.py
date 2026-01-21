@@ -342,6 +342,10 @@ class AS5311HeartbeatNode(QWidget, SensorNodeInterface):
         self.beat_flash_timer.timeout.connect(self.hide_beat_marker)
         self.last_beat_shown = 0
 
+        # Smooth adjustment tracking for gradual drift when heartbeat lost
+        self.current_adjustment = 1.0  # 1.0 = no adjustment (midpoint)
+        self.drift_rate = 0.02  # How fast to drift back to midpoint per process call
+
         self.update_lines()
         self.update_sensitivity()
 
@@ -380,7 +384,11 @@ class AS5311HeartbeatNode(QWidget, SensorNodeInterface):
 
     def process(self, parameters):
         """Modify volume based on detected heart rate"""
-        if 'volume' in parameters and self.current_bpm > 0:
+        if 'volume' not in parameters:
+            return
+
+        if self.current_bpm > 0:
+            # Heartbeat detected - calculate target adjustment
             xp = [self.spinbox_low_bpm.value(), self.spinbox_high_bpm.value()]
 
             if self.spinbox_volume.value() >= 0:
@@ -388,12 +396,21 @@ class AS5311HeartbeatNode(QWidget, SensorNodeInterface):
             else:
                 yp = [1, 1 + self.spinbox_volume.value() / 100]
 
-            adjustment = np.clip(np.interp(self.current_bpm, xp, yp), 0, 1)
+            target_adjustment = np.clip(np.interp(self.current_bpm, xp, yp), 0, 1)
 
-            # Weight by confidence - low confidence reduces effect
-            adjustment = 1.0 + (adjustment - 1.0) * self.current_confidence
+            # Weight by confidence - low confidence moves toward midpoint
+            target_adjustment = 1.0 + (target_adjustment - 1.0) * self.current_confidence
 
-            parameters['volume'] *= adjustment
+            # Smoothly move toward target adjustment
+            diff = target_adjustment - self.current_adjustment
+            self.current_adjustment += diff * 0.3  # Smooth tracking
+        else:
+            # No heartbeat detected - gradually drift toward midpoint (1.0)
+            diff = 1.0 - self.current_adjustment
+            self.current_adjustment += diff * self.drift_rate
+
+        # Apply the current adjustment (whether tracking or drifting)
+        parameters['volume'] *= self.current_adjustment
 
     def update_graph_data(self):
         if len(self.x) == 0:
