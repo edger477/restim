@@ -24,7 +24,7 @@ from stim_math.audio_gen.base_classes import RemoteGenerationAlgorithm
 
 from device.focstim.focstim_rpc_pb2 import Response
 from device.focstim.messages_pb2 import ResponseCapabilitiesGet, ResponseFirmwareVersion
-from device.focstim.constants_pb2 import OutputMode
+from device.focstim.constants_pb2 import OutputMode, ERROR_ALREADY_PLAYING
 from stim_math.sensors.as5311 import AS5311Data
 
 from stim_math.sensors.imu import IMUData
@@ -465,9 +465,16 @@ class FOCStimProtoDevice(QObject, OutputDevice):
 
         def on_signal_start_response(response: Response):
             if response.HasField("error"):
-                s = google.protobuf.text_format.MessageToString(response.error, as_one_line=True, print_unknown_fields=True)
-                logger.error(s)
-                self.stop()
+                if response.error.code == ERROR_ALREADY_PLAYING:
+                    # Device already playing - stop it and retry
+                    logger.info("device already playing, stopping and retrying...")
+                    self.api.request_stop_signal()
+                    # Retry start after a short delay
+                    QTimer.singleShot(100, self.start_signal_generation)
+                else:
+                    s = google.protobuf.text_format.MessageToString(response.error, as_one_line=True, print_unknown_fields=True)
+                    logger.error(s)
+                    self.stop()
             else:
                 logger.info("signal generation started!")
                 self.start_transmit_loop()
