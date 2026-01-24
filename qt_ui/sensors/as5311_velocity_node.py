@@ -78,14 +78,33 @@ class AS5311VelocitySensorNode(QWidget, SensorNodeInterface):
 
         self.p1.setXRange(-10, 0, padding=0.05)
 
+        # setup volume output plot (smaller, at bottom)
+        self.graph.nextRow()
+        self.p_volume = self.graph.addPlot()
+        self.p_volume.setXLink(self.p1)
+        self.p_volume.setLabels(left=('Volume', ''))
+        self.p_volume.enableAutoRange(axis='y')
+        self.p_volume.addLegend(offset=(30, 5))
+
+        self.volume_plot_item = pg.PlotDataItem(name='adjustment')
+        self.volume_plot_item.setPen(pg.mkPen({'color': "green", 'width': 2}))
+        self.p_volume.addItem(self.volume_plot_item)
+
+        # Set row stretch factors: main plots 2 each, volume plot 1 (makes volume ~1/5 of total)
+        self.graph.ci.layout.setRowStretchFactor(0, 2)
+        self.graph.ci.layout.setRowStretchFactor(1, 2)
+        self.graph.ci.layout.setRowStretchFactor(2, 1)
+
         # setup algorithm variables
         self.last_position = 0
         self.velocity = 0
+        self.current_adjustment = 1.0
 
         # setup plot variables
         self.x = []
         self.y = []
         self.y_filtered = []
+        self.y_volume = []
 
         self.update_lines()
 
@@ -100,31 +119,39 @@ class AS5311VelocitySensorNode(QWidget, SensorNodeInterface):
             velo = np.abs(velo)
         self.velocity += (velo - self.velocity) * (1 / self.spinbox_decay.value())
 
+        # Calculate current adjustment for plotting
+        self._calculate_adjustment()
+
         self.x.append(time.time())
         self.y.append(data.x)
         self.y_filtered.append(self.velocity)
+        self.y_volume.append(self.current_adjustment)
 
         threshold = time.time() - 10
         while len(self.x) and self.x[0] < threshold:
             del self.x[0]
             del self.y[0]
             del self.y_filtered[0]
+            del self.y_volume[0]
 
         self.update_graph_data()
 
+    def _calculate_adjustment(self):
+        """Calculate volume adjustment based on current velocity."""
+        xp = [self.spinbox_low.value(), self.spinbox_high.value()]
+        if self.spinbox_volume.value() >= 0:
+            yp = [1 - self.spinbox_volume.value() / 100, 1]
+        else:
+            yp = [1, 1 + self.spinbox_volume.value() / 100]
+        # check sorting
+        if xp[1] < xp[0]:
+            xp = xp[::-1]
+            yp = yp[::-1]
+        self.current_adjustment = np.clip(np.interp(self.velocity, xp, yp), 0, 1)
+
     def process(self, parameters):
         if 'volume' in parameters:
-            xp = [self.spinbox_low.value(), self.spinbox_high.value()]
-            if self.spinbox_volume.value() >= 0:
-                yp = [1 - self.spinbox_volume.value() / 100, 1]
-            else:
-                yp = [1, 1 + self.spinbox_volume.value() / 100]
-            # check sorting
-            if xp[1] < xp[0]:
-                xp = xp[::-1]
-                yp = yp[::-1]
-            adjustment = np.clip(np.interp(self.velocity, xp, yp), 0, 1)
-            parameters['volume'] *= adjustment
+            parameters['volume'] *= self.current_adjustment
 
     def update_graph_data(self):
         x = np.array(self.x) - self.x[-1]
@@ -133,6 +160,9 @@ class AS5311VelocitySensorNode(QWidget, SensorNodeInterface):
 
         y2 = np.array(self.y_filtered)
         self.filtered_plot_item.setData(x=x, y=y2)
+
+        y_vol = np.array(self.y_volume)
+        self.volume_plot_item.setData(x=x, y=y_vol)
 
     def update_lines(self, *args, **kwargs):
         self.low_marker.setValue(self.spinbox_low.value())
