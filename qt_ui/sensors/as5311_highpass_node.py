@@ -34,6 +34,12 @@ class AS5311HighPassNode(QWidget, SensorNodeInterface):
         self.spinbox_low.valueChanged.connect(self.update_lines)
         self.spinbox_high.valueChanged.connect(self.update_lines)
 
+        # Connect to save settings on change
+        self.spinbox_low.valueChanged.connect(self.save_settings)
+        self.spinbox_high.valueChanged.connect(self.save_settings)
+        self.spinbox_volume.valueChanged.connect(self.save_settings)
+        self.checkbox.stateChanged.connect(self.save_settings)
+
         self.formLayout.addRow('high threshold', self.spinbox_high)
         self.formLayout.addRow('low threshold', self.spinbox_low)
         label = QLabel('volume change (?)')
@@ -105,6 +111,27 @@ class AS5311HighPassNode(QWidget, SensorNodeInterface):
         self.y_volume = []
 
         self.update_lines()
+
+        # Load saved settings
+        self.load_settings()
+
+    def _get_settings_dict(self):
+        return {
+            'high_threshold': self.spinbox_high.value(),
+            'low_threshold': self.spinbox_low.value(),
+            'volume_change': self.spinbox_volume.value(),
+            'absolute': self.checkbox.isChecked(),
+        }
+
+    def _apply_settings_dict(self, settings):
+        if 'high_threshold' in settings:
+            self.spinbox_high.setValue(float(settings['high_threshold']))
+        if 'low_threshold' in settings:
+            self.spinbox_low.setValue(float(settings['low_threshold']))
+        if 'volume_change' in settings:
+            self.spinbox_volume.setValue(float(settings['volume_change']))
+        if 'absolute' in settings:
+            self.checkbox.setChecked(settings['absolute'] in (True, 'true', '1'))
 
     def new_as5311_sensor_data(self, data: AS5311Data):
         if not self.is_node_enabled():
