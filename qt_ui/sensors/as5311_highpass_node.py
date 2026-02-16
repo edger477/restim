@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QWidget, QFormLayout, QVBoxLayout, QGroupBox, QLab
 import pyqtgraph as pg
 import numpy as np
 
+from qt_ui.sensors import styles
 from qt_ui.sensors.sensor_node_interface import SensorNodeInterface
 from stim_math.sensors.as5311 import AS5311Data
 from stim_math.sensors.filters import HighPass
@@ -26,27 +27,26 @@ class AS5311HighPassNode(QWidget, SensorNodeInterface):
         self.verticalLayout.addWidget(self.groupbox)
         self.formLayout = QFormLayout(self.groupbox)
 
-        self.spinbox_high = pg.SpinBox(None, 0.0, compactHeight=False, suffix='m', siPrefix=True, dec=True, minStep=1e-6)
-        self.spinbox_low = pg.SpinBox(None, 0.0, compactHeight=False, suffix='m', siPrefix=True, dec=True, minStep=1e-6)
+        self.spinbox_threshold = pg.SpinBox(None, 0.0, compactHeight=False, suffix='m', siPrefix=True, dec=True, minStep=1e-6)
+        self.spinbox_range = pg.SpinBox(None, 0.0, compactHeight=False, suffix='m', siPrefix=True, dec=True, minStep=1e-6, bounds=[0, None])
         self.spinbox_volume = pg.SpinBox(None, 0.0, compactHeight=False, suffix='%', step=0.1)
         self.checkbox = QCheckBox()
 
-        self.spinbox_low.valueChanged.connect(self.update_lines)
-        self.spinbox_high.valueChanged.connect(self.update_lines)
+        self.spinbox_threshold.valueChanged.connect(self.update_lines)
+        self.spinbox_range.valueChanged.connect(self.update_lines)
 
         # Connect to save settings on change
-        self.spinbox_low.valueChanged.connect(self.save_settings)
-        self.spinbox_high.valueChanged.connect(self.save_settings)
+        self.spinbox_threshold.valueChanged.connect(self.save_settings)
+        self.spinbox_range.valueChanged.connect(self.save_settings)
         self.spinbox_volume.valueChanged.connect(self.save_settings)
         self.checkbox.stateChanged.connect(self.save_settings)
 
-        self.formLayout.addRow('high threshold', self.spinbox_high)
-        self.formLayout.addRow('low threshold', self.spinbox_low)
+        self.formLayout.addRow('threshold', self.spinbox_threshold)
+        self.formLayout.addRow('threshold range', self.spinbox_range)
         label = QLabel('volume change (?)')
         label.setToolTip(
-            "Increase volume when near 'high threshold'\r\n"
-            "Reduce volume when near 'low threshold'\r\n"
-            "Negative value to reverse")
+            "positive: increase volume when clenching\r\n"
+            "negative: decrease volume when clenching")
         self.formLayout.addRow(label, self.spinbox_volume)
         self.formLayout.addRow('absolute', self.checkbox)
 
@@ -66,17 +66,17 @@ class AS5311HighPassNode(QWidget, SensorNodeInterface):
         self.p2.addLegend(offset=(30, 5))
 
         self.position_plot_item = pg.PlotDataItem(name='position')
-        self.position_plot_item.setPen(pg.mkPen({'color': "blue", 'width': 1}))
+        self.position_plot_item.setPen(styles.blue_line)
         self.p1.addItem(self.position_plot_item)
 
         self.filtered_plot_item = pg.PlotDataItem(name='position (filtered)')
-        self.filtered_plot_item.setPen(pg.mkPen({'color': "orange", 'width': 1}))
+        self.filtered_plot_item.setPen(styles.orange_line)
         self.p2.addItem(self.filtered_plot_item)
 
-        self.low_marker = pg.InfiniteLine(1, 0, movable=False)
+        self.low_marker = pg.InfiniteLine(1, 0, movable=False, pen=styles.yellow_line_solid)
         self.p2.addItem(self.low_marker)
 
-        self.high_marker = pg.InfiniteLine(10, 0, movable=False)
+        self.high_marker = pg.InfiniteLine(10, 0, movable=False, pen=styles.yellow_line_dash)
         self.p2.addItem(self.high_marker)
 
         self.p1.setXRange(-10, 0, padding=0.05)
@@ -117,17 +117,23 @@ class AS5311HighPassNode(QWidget, SensorNodeInterface):
 
     def _get_settings_dict(self):
         return {
-            'high_threshold': self.spinbox_high.value(),
-            'low_threshold': self.spinbox_low.value(),
+            'threshold': self.spinbox_threshold.value(),
+            'range': self.spinbox_range.value(),
             'volume_change': self.spinbox_volume.value(),
             'absolute': self.checkbox.isChecked(),
         }
 
     def _apply_settings_dict(self, settings):
-        if 'high_threshold' in settings:
-            self.spinbox_high.setValue(float(settings['high_threshold']))
-        if 'low_threshold' in settings:
-            self.spinbox_low.setValue(float(settings['low_threshold']))
+        if 'threshold' in settings:
+            self.spinbox_threshold.setValue(float(settings['threshold']))
+        elif 'low_threshold' in settings:
+            self.spinbox_threshold.setValue(float(settings['low_threshold']))
+
+        if 'range' in settings:
+            self.spinbox_range.setValue(float(settings['range']))
+        elif 'high_threshold' in settings and 'low_threshold' in settings:
+             self.spinbox_range.setValue(float(settings['high_threshold']) - float(settings['low_threshold']))
+
         if 'volume_change' in settings:
             self.spinbox_volume.setValue(float(settings['volume_change']))
         if 'absolute' in settings:
@@ -160,7 +166,9 @@ class AS5311HighPassNode(QWidget, SensorNodeInterface):
 
     def _calculate_adjustment(self):
         """Calculate volume adjustment based on current filtered position."""
-        xp = [self.spinbox_low.value(), self.spinbox_high.value()]
+        low = self.spinbox_threshold.value()
+        high = low + self.spinbox_range.value()
+        xp = [low, high]
         if self.spinbox_volume.value() >= 0:
             yp = [1 - self.spinbox_volume.value() / 100, 1]
         else:
@@ -187,6 +195,8 @@ class AS5311HighPassNode(QWidget, SensorNodeInterface):
         self.volume_plot_item.setData(x=x, y=y_vol)
 
     def update_lines(self, *args, **kwargs):
-        self.low_marker.setValue(self.spinbox_low.value())
-        self.high_marker.setValue(self.spinbox_high.value())
+        low = self.spinbox_threshold.value()
+        high = low + self.spinbox_range.value()
+        self.low_marker.setValue(low)
+        self.high_marker.setValue(high)
 
