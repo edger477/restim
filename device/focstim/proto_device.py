@@ -3,6 +3,7 @@ import time
 import datetime
 import os
 
+import numpy as np
 import stream # pystream-protobuf
 
 import google.protobuf.text_format
@@ -13,9 +14,10 @@ from PySide6.QtNetwork import QTcpSocket
 
 import qt_ui.settings
 from device.focstim.proto_api import FOCStimProtoAPI
-from device.focstim.notifications_pb2 import NotificationBoot, NotificationPotentiometer, NotificationCurrents, \
+from device.focstim.notifications_pb2 import (NotificationBoot, NotificationDeviceVolume, NotificationCurrents, \
     NotificationModelEstimation, NotificationSystemStats, NotificationSignalStats, NotificationBattery, \
-    NotificationLSM6DSOX, NotificationDebugString, NotificationDebugAS5311, NotificationPressure
+    NotificationLSM6DSOX, NotificationButtonPress, NotificationDebugString, NotificationDebugAS5311, \
+    NotificationPressure, NotificationDebugTeleplot)
 from net.teleplot import Teleplot
 from device.output_device import OutputDevice
 from stim_math.audio_gen.base_classes import RemoteGenerationAlgorithm
@@ -190,7 +192,7 @@ class FOCStimProtoDevice(QObject, OutputDevice):
 
         self.api = FOCStimProtoAPI(self, self.transport, self.notification_log)
         self.api.on_notification_boot.connect(self.handle_notification_boot)
-        self.api.on_notification_potentiometer.connect(self.handle_notification_potentiometer)
+        self.api.on_notification_device_volume.connect(self.handle_notification_device_volume)
         self.api.on_notification_currents.connect(self.handle_notification_currents)
         self.api.on_notification_model_estimation.connect(self.handle_notification_model_estimation)
         self.api.on_notification_system_stats.connect(self.handle_notification_system_stats)
@@ -198,8 +200,10 @@ class FOCStimProtoDevice(QObject, OutputDevice):
         self.api.on_notification_battery.connect(self.handle_notification_battery)
         self.api.on_notification_lsm6dsox.connect(self.handle_notification_lsm6dsox)
         self.api.on_notification_pressure.connect(self.handle_notification_pressure)
+        self.api.on_notification_button_press.connect(self.handle_notification_button_press)
         self.api.on_notification_debug_string.connect(self.handle_notification_debug_string)
         self.api.on_notification_debug_as5311.connect(self.handle_notification_debug_as5311)
+        self.api.on_notification_debug_teleplot.connect(self.handle_notification_debug_teleplot)
 
         # Notify that API is ready for external connections
         self.api_ready.emit()
@@ -380,10 +384,10 @@ class FOCStimProtoDevice(QObject, OutputDevice):
         logger.error('boot notification received')
         self.stop()
 
-    def handle_notification_potentiometer(self, notif: NotificationPotentiometer):
+    def handle_notification_device_volume(self, notif: NotificationDeviceVolume):
         if self.teleplot:
             self.teleplot.write_metrics(
-                pot=notif.value
+                pot=notif.volume
             )
 
     def handle_notification_currents(self, notif: NotificationCurrents):
@@ -405,17 +409,21 @@ class FOCStimProtoDevice(QObject, OutputDevice):
 
     def handle_notification_model_estimation(self, notif: NotificationModelEstimation):
         if self.teleplot:
+            a = notif.resistance_a + 1j * notif.reluctance_a
+            b = notif.resistance_b + 1j * notif.reluctance_b
+            c = notif.resistance_c + 1j * notif.reluctance_c
+            d = notif.resistance_d + 1j * notif.reluctance_d
             self.teleplot.write_metrics(
-                R_a=f"{notif.resistance_a}",
-                R_b=f"{notif.resistance_b}",
-                R_c=f"{notif.resistance_c}",
-                R_d=f"{notif.resistance_d}",
-                # These really slow teleplot down...
-                # Z_a=f"{notif.resistance_a}:{notif.reluctance_a}|xy",
-                # Z_b=f"{notif.resistance_b}:{notif.reluctance_b}|xy",
-                # Z_c=f"{notif.resistance_c}:{notif.reluctance_c}|xy",
-                # Z_d=f"{notif.resistance_d}:{notif.reluctance_d}|xy"
+                R_a=np.abs(a),
+                R_b=np.abs(b),
+                R_c=np.abs(c),
+                R_d=np.abs(d),
+                angle_a=np.angle(a),
+                angle_b=np.angle(b),
+                angle_c=np.angle(c),
+                angle_d=np.angle(d),
             )
+
 
     def handle_notification_system_stats(self, notif: NotificationSystemStats):
         if notif.HasField('esc1'):
@@ -471,6 +479,9 @@ class FOCStimProtoDevice(QObject, OutputDevice):
             PressureData(notif.pressure)
         )
 
+    def handle_notification_button_press(self, notif: NotificationBoot):
+        pass
+
     def handle_notification_debug_string(self, notif: NotificationDebugString):
         logger.warning(notif.message)
 
@@ -483,6 +494,12 @@ class FOCStimProtoDevice(QObject, OutputDevice):
             )
         m = notif.tracked * (2000.0 / 4096) * 1e-6
         self.new_as5311_sensor_data.emit(AS5311Data(m))
+
+    def handle_notification_debug_teleplot(self, notif: NotificationDebugTeleplot):
+        if self.teleplot:
+            self.teleplot.write_metrics(
+                **{notif.id: notif.value}
+            )
 
     new_imu_sensor_data = Signal(IMUData)
     new_as5311_sensor_data = Signal(AS5311Data)

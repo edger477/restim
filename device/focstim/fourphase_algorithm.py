@@ -22,6 +22,8 @@ class FOCStimFourphaseAlgorithm(RemoteGenerationAlgorithm):
         assert safety_limits.waveform_amplitude_amps >= (limits.WaveformAmpltiudeFOC.min - epsilon)
         assert safety_limits.waveform_amplitude_amps <= (limits.WaveformAmpltiudeFOC.max + epsilon)
 
+        self.sensor_node = None
+
     # todo: more descriptive name
     def outputs(self):
         return 4
@@ -54,6 +56,16 @@ class FOCStimFourphaseAlgorithm(RemoteGenerationAlgorithm):
 
         a, b, c, d = self.intensity_params.get_position(t)
 
+        if self.sensor_node:
+            params = {'volume': volume, 'e1': a, 'e2': b, 'e3': c, 'e4': d}
+            self.sensor_node.process(params)
+            # safety: new volume must be less than original
+            volume = np.clip(params['volume'], 0, volume)
+            a = params['e1']
+            b = params['e2']
+            c = params['e3']
+            d = params['e4']
+
         if not self.media.is_playing():
             volume *= 0
 
@@ -62,7 +74,7 @@ class FOCStimFourphaseAlgorithm(RemoteGenerationAlgorithm):
             AxisType.AXIS_ELECTRODE_2_POWER: b,
             AxisType.AXIS_ELECTRODE_3_POWER: c,
             AxisType.AXIS_ELECTRODE_4_POWER: d,
-            AxisType.AXIS_WAVEFORM_AMPLITUDE_AMPS: volume * volume * self.safety_limits.waveform_amplitude_amps,
+            AxisType.AXIS_WAVEFORM_AMPLITUDE_AMPS: volume * self.safety_limits.waveform_amplitude_amps,
             AxisType.AXIS_CARRIER_FREQUENCY_HZ: carrier_frequency,
             AxisType.AXIS_PULSE_FREQUENCY_HZ: self.params.pulse_frequency.interpolate(t),
             AxisType.AXIS_PULSE_WIDTH_IN_CYCLES: self.params.pulse_width.interpolate(t),

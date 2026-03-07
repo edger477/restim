@@ -141,6 +141,7 @@ class Window(QMainWindow, Ui_MainWindow):
             self, self.intensity_a, self.intensity_b, self.intensity_c, self.intensity_d)
         self.graphicsView_fourphase.mousePositionChanged.connect(self.motion_4.mouse_event)
         self.motion_4.position_updated.connect(self.graphicsView_fourphase.set_electrode_intensities)
+        self.graphicsView_fourphase.set_sensor_widget(self.page_sensors)
 
         # TODO: implement details for 4-phase
         self.tab_details.set_axis(
@@ -662,6 +663,7 @@ class Window(QMainWindow, Ui_MainWindow):
         self.tab_vibrate.save_settings()
         self.tab_pulse_settings.save_settings()
         self.tab_volume.save_settings()
+        self.page_media.save_settings()
 
     def closeEvent(self, event):
         logger.warning('Shutting down')

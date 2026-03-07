@@ -1,3 +1,4 @@
+import constants_pb2 as _constants_pb2
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Mapping as _Mapping
@@ -10,12 +11,24 @@ class NotificationBoot(_message.Message):
     def __init__(self) -> None:
         ...
 
-class NotificationPotentiometer(_message.Message):
-    __slots__ = ('value',)
-    VALUE_FIELD_NUMBER: _ClassVar[int]
-    value: float
+class NotificationDeviceVolume(_message.Message):
+    __slots__ = ('volume', 'locked')
+    VOLUME_FIELD_NUMBER: _ClassVar[int]
+    LOCKED_FIELD_NUMBER: _ClassVar[int]
+    volume: float
+    locked: bool
 
-    def __init__(self, value: _Optional[float]=...) -> None:
+    def __init__(self, volume: _Optional[float]=..., locked: bool=...) -> None:
+        ...
+
+class NotificationButtonPress(_message.Message):
+    __slots__ = ('state', 'timestamp_ms')
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
+    state: _constants_pb2.ButtonState
+    timestamp_ms: int
+
+    def __init__(self, state: _Optional[_Union[_constants_pb2.ButtonState, str]]=..., timestamp_ms: _Optional[int]=...) -> None:
         ...
 
 class NotificationCurrents(_message.Message):
@@ -196,4 +209,14 @@ class NotificationDebugEdging(_message.Message):
     reduction: float
 
     def __init__(self, full_power_threshold: _Optional[float]=..., reduced_power_threshold: _Optional[float]=..., reduction: _Optional[float]=...) -> None:
+        ...
+
+class NotificationDebugTeleplot(_message.Message):
+    __slots__ = ('id', 'value')
+    ID_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    value: float
+
+    def __init__(self, id: _Optional[str]=..., value: _Optional[float]=...) -> None:
         ...
