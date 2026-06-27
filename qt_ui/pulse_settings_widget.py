@@ -150,6 +150,15 @@ class PulseSettingsWidget(QtWidgets.QWidget):
         details_info = QtWidgets.QLabel("placeholder")
         gb_l.addRow(details_label, details_info)
 
+        pulse_width_as_duty_cycle_checkbox = QtWidgets.QCheckBox(
+            "Interpret pulse_width as desired duty cycle")
+        pulse_width_as_duty_cycle_checkbox.setChecked(settings.pulse_width_as_duty_cycle.get())
+        pulse_width_as_duty_cycle_checkbox.setToolTip(
+            'When a pulse_width funscript is loaded, treat its values as desired duty cycle (0–1) '
+            'instead of pulse width in carrier cycles. restim will continuously compute the correct '
+            'pulse width as: pulse_width = duty_cycle × carrier_freq / pulse_freq.')
+        gb_l.addRow(pulse_width_as_duty_cycle_checkbox)
+
         gb.setLayout(gb_l)
         l.addWidget(gb)
 
@@ -159,6 +168,7 @@ class PulseSettingsWidget(QtWidgets.QWidget):
         self.details_info = details_info
         self.pulse_interval_random = pulse_interval_random_slider
         self.pulse_rise_time = pulse_rise_time_slider
+        self.pulse_width_as_duty_cycle_checkbox = pulse_width_as_duty_cycle_checkbox
 
 
         self.carrier_controller = AxisController(self.carrier)
@@ -209,3 +219,4 @@ class PulseSettingsWidget(QtWidgets.QWidget):
         settings.pulse_width.set(self.pulse_width_controller.last_user_entered_value)
         settings.pulse_interval_random.set(self.pulse_interval_random_controller.last_user_entered_value * 100)
         settings.pulse_rise_time.set(self.pulse_rise_time_controller.last_user_entered_value)
+        settings.pulse_width_as_duty_cycle.set(self.pulse_width_as_duty_cycle_checkbox.isChecked())
