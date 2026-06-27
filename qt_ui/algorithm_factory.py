@@ -10,6 +10,7 @@ from stim_math.audio_gen.pulse_based import DefaultThreePhasePulseBasedAlgorithm
 from stim_math.audio_gen.continuous import ThreePhaseAlgorithm
 from stim_math.audio_gen.params import *
 
+from qt_ui import settings as qt_settings
 from qt_ui.models.funscript_kit import FunscriptKitModel
 from qt_ui.models.script_mapping import ScriptMappingModel
 from qt_ui.device_wizard.axes import AxisEnum
@@ -81,6 +82,21 @@ class AlgorithmFactory:
         return algorithm
 
     def create_3phase_pulsebased(self, device: DeviceConfiguration) -> AudioGenerationAlgorithm:
+        pw_funscript_item = self.script_mapping.get_config_for_axis(AxisEnum.PULSE_WIDTH)
+        pulse_width_is_duty_cycle = (
+            qt_settings.pulse_width_as_duty_cycle.get() and
+            pw_funscript_item is not None and
+            self.load_funscripts
+        )
+        if pulse_width_is_duty_cycle:
+            pulse_width_axis = create_precomputed_axis(
+                pw_funscript_item.script.x,
+                np.clip(pw_funscript_item.script.y, 0.0, 1.0),
+                self.timestamp_mapper,
+            )
+        else:
+            pulse_width_axis = self.get_axis_pulse_width()
+
         algorithm = DefaultThreePhasePulseBasedAlgorithm(
             self.media_sync,
             ThreephasePulsebasedAlgorithmParams(
@@ -100,14 +116,15 @@ class AlgorithmFactory:
                 ),
                 carrier_frequency=self.get_axis_pulse_carrier_frequency(),
                 pulse_frequency=self.get_axis_pulse_frequency(),
-                pulse_width=self.get_axis_pulse_width(),
+                pulse_width=pulse_width_axis,
                 pulse_interval_random=self.get_axis_pulse_interval_random(),
                 pulse_rise_time=self.get_axis_pulse_rise_time(),
             ),
             safety_limits=SafetyParams(
                 device.min_frequency,
                 device.max_frequency,
-            )
+            ),
+            pulse_width_is_duty_cycle=pulse_width_is_duty_cycle,
         )
         return algorithm
 
