@@ -157,6 +157,8 @@ class PulseSettingsWidget(QtWidgets.QWidget):
             'When a pulse_width funscript is loaded, treat its values as desired duty cycle (0–1) '
             'instead of pulse width in carrier cycles. restim will continuously compute the correct '
             'pulse width as: pulse_width = duty_cycle × carrier_freq / pulse_freq.')
+        pulse_width_as_duty_cycle_checkbox.stateChanged.connect(
+            lambda state: settings.pulse_width_as_duty_cycle.set(bool(state)))
         gb_l.addRow(pulse_width_as_duty_cycle_checkbox)
 
         gb.setLayout(gb_l)
