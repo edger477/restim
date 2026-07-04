@@ -82,20 +82,20 @@ class AlgorithmFactory:
         return algorithm
 
     def create_3phase_pulsebased(self, device: DeviceConfiguration) -> AudioGenerationAlgorithm:
-        pw_funscript_item = self.script_mapping.get_config_for_axis(AxisEnum.PULSE_WIDTH)
-        pulse_width_is_duty_cycle = (
-            qt_settings.pulse_width_as_duty_cycle.get() and
-            pw_funscript_item is not None and
+        pf_funscript_item = self.script_mapping.get_config_for_axis(AxisEnum.PULSE_FREQUENCY)
+        pulse_frequency_is_speed = (
+            qt_settings.pulse_frequency_as_speed.get() and
+            pf_funscript_item is not None and
             self.load_funscripts
         )
-        if pulse_width_is_duty_cycle:
-            pulse_width_axis = create_precomputed_axis(
-                pw_funscript_item.script.x,
-                np.clip(pw_funscript_item.script.y, 0.0, 1.0),
+        if pulse_frequency_is_speed:
+            pulse_frequency_axis = create_precomputed_axis(
+                pf_funscript_item.script.x,
+                np.clip(pf_funscript_item.script.y, 0.0, 1.0),
                 self.timestamp_mapper,
             )
         else:
-            pulse_width_axis = self.get_axis_pulse_width()
+            pulse_frequency_axis = self.get_axis_pulse_frequency()
 
         algorithm = DefaultThreePhasePulseBasedAlgorithm(
             self.media_sync,
@@ -115,8 +115,8 @@ class AlgorithmFactory:
                     external=self.get_axis_volume_external(),
                 ),
                 carrier_frequency=self.get_axis_pulse_carrier_frequency(),
-                pulse_frequency=self.get_axis_pulse_frequency(),
-                pulse_width=pulse_width_axis,
+                pulse_frequency=pulse_frequency_axis,
+                pulse_width=self.get_axis_pulse_width(),
                 pulse_interval_random=self.get_axis_pulse_interval_random(),
                 pulse_rise_time=self.get_axis_pulse_rise_time(),
             ),
@@ -124,7 +124,7 @@ class AlgorithmFactory:
                 device.min_frequency,
                 device.max_frequency,
             ),
-            pulse_width_is_duty_cycle=pulse_width_is_duty_cycle,
+            pulse_frequency_is_speed=pulse_frequency_is_speed,
         )
         return algorithm
 

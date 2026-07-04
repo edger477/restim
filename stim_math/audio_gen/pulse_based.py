@@ -100,7 +100,7 @@ class ThreePhasePulseBasedAlgorithmBase(AudioGenerationAlgorithm):
 
 class DefaultThreePhasePulseBasedAlgorithm(ThreePhasePulseBasedAlgorithmBase):
     def __init__(self, media: AbstractMediaSync, params: ThreephasePulsebasedAlgorithmParams, safety_limits: SafetyParams,
-                 pulse_width_is_duty_cycle: bool = False):
+                 pulse_frequency_is_speed: bool = False):
         super().__init__(media, params.calibrate)
         self.params = params
         self.position_params = ThreePhasePosition(params.position, params.transform)
@@ -109,7 +109,7 @@ class DefaultThreePhasePulseBasedAlgorithm(ThreePhasePulseBasedAlgorithmBase):
         self.safety_limits = safety_limits
         self.last_pulse_polarity = 1
         self.last_pulse_start_angle = 0
-        self.pulse_width_is_duty_cycle = pulse_width_is_duty_cycle
+        self.pulse_frequency_is_speed = pulse_frequency_is_speed
 
     def next_pulse_data(self, samplerate, at_time: float, system_time_estimate: float) -> PulseInfo:
         self.seq += 1
@@ -124,14 +124,16 @@ class DefaultThreePhasePulseBasedAlgorithm(ThreePhasePulseBasedAlgorithmBase):
         pulse_carrier_freq = np.clip(pulse_carrier_freq,
                                      self.safety_limits.minimum_carrier_frequency,
                                      self.safety_limits.maximum_carrier_frequency)
-        pulse_freq = self.params.pulse_frequency.interpolate(system_time_estimate)
-        pulse_freq = np.clip(pulse_freq, limits.PulseFrequency.min, limits.PulseFrequency.max)
-        if self.pulse_width_is_duty_cycle:
-            desired_duty_cycle = np.clip(self.params.pulse_width.interpolate(system_time_estimate), 0.0, 1.0)
-            pulse_width = desired_duty_cycle * pulse_carrier_freq / pulse_freq
-        else:
-            pulse_width = self.params.pulse_width.interpolate(system_time_estimate)
+        pulse_width = self.params.pulse_width.interpolate(system_time_estimate)
         pulse_width = np.clip(pulse_width, limits.PulseWidth.min, limits.PulseWidth.max)
+        if self.pulse_frequency_is_speed:
+            speed = np.clip(self.params.pulse_frequency.interpolate(system_time_estimate), 0.0, 1.0)
+            wavelet_seconds = pulse_width / pulse_carrier_freq
+            gap_seconds = 0.5 * (0.01 ** speed)
+            pulse_freq = np.clip(1.0 / (wavelet_seconds + gap_seconds), limits.PulseFrequency.min, limits.PulseFrequency.max)
+        else:
+            pulse_freq = self.params.pulse_frequency.interpolate(system_time_estimate)
+            pulse_freq = np.clip(pulse_freq, limits.PulseFrequency.min, limits.PulseFrequency.max)
         pulse_rise_time = self.params.pulse_rise_time.interpolate(system_time_estimate)
         pulse_rise_time = np.clip(pulse_rise_time, limits.PulseRiseTime.min, limits.PulseRiseTime.max)
 
